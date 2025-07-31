@@ -7,11 +7,17 @@ import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 import urlShortener.model.AccessRecord;
 import urlShortener.model.URLRecord;
+import urlShortener.repository.AccessRecordRepository;
+import urlShortener.repository.ShortUrlRepository;
 
 import java.io.*;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.rmi.AccessException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -26,10 +32,14 @@ public class UrlShortenerService {
     private final Logger logger = Logger.getLogger(UrlShortenerService.class.getName());
     @Autowired
     private Environment environment;
+    @Autowired
+    ShortUrlRepository shortUrlRepository;
+    @Autowired
+    AccessRecordRepository accessRecordRepository;
 
     @PostConstruct
     public void retrievePreviousRunData() {
-        this.loadFromFile();
+        //this.loadFromFile();
     }
 
     // Base URL for our service
@@ -44,7 +54,7 @@ public class UrlShortenerService {
     @Value("${short.service.storage.file.name}")
     private String DATA_FILE;
     @Value("${keep.record.alive}")
-    private long expiryTime;
+    private long lifeLimit;
 
     /**
      * URLRecord - stores all information about a shortened URL
@@ -56,11 +66,26 @@ public class UrlShortenerService {
         this.accessHistory = new ArrayList<>();
     }
 
+
+    public void warmupCashesFromRepository(List<URLRecord> listOfRecords) {
+        if (listOfRecords.isEmpty()) {
+            logger.log(Level.INFO, "No previous records detected. Nothing to warm up.");
+        }
+        listOfRecords
+                .forEach(record -> {
+                    shortToLong.put(record.shortCode(), record);
+                    longToShort.put(record.originalURL(), record.shortCode());
+                    logger.log(Level.INFO, record.toString());
+                });
+    }
+
+
     /**
      * Load data from file (if exists)
      */
     private void loadFromFile() {
-        File file = new File(DATA_FILE);
+        Path path = Paths.get("/urlShort/data","backup_file");
+        File file = path.toFile();
         if (!file.exists()) {
             logger.info("No existing data file found. Starting fresh.");
             return;
@@ -81,21 +106,34 @@ public class UrlShortenerService {
      * Save data to file
      */
     public void saveToFile() {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+        logger.log(Level.INFO, "Attempting to save URLRecords to a file " + DATA_FILE);
+        Path path = Paths.get("/urlShort/data","backup_file");
+        File file = path.toFile();
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
             oos.writeObject(shortToLong);
             oos.writeObject(longToShort);
             logger.log(Level.INFO,"Saved " + shortToLong.size() + " URLs to file.");
         } catch (IOException e) {
             logger.log(Level.SEVERE, "Error saving data to file: " + e.getMessage());
         }
+        File f = new File(DATA_FILE);
+        logger.log(Level.INFO,"Created File " + f.getAbsolutePath() + " of size " + f.length());
     }
 
     public String expandUrl (String shortUrl) {
         if (shortToLong.containsKey(shortUrl)) {
-            accessHistory.add(new AccessRecord(shortUrl, LocalDateTime.now()));
-            return shortToLong.get(shortUrl).originalURL();
-        } else
-            return null;
+            AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
+            accessHistory.add(accessRecord);
+            accessRecordRepository.save(accessRecord);
+            Optional<URLRecord> optRecord = shortUrlRepository.findById(shortUrl);
+            if (optRecord.isPresent())
+                return optRecord.get().originalURL();
+            else {
+                logger.log(Level.WARNING, "URL for " + shortUrl + " not found in the repository.");
+            }
+            //return shortToLong.get(shortUrl).originalURL();
+        }
+        return null;
     }
 
     public String shortenUrl(String realUrl) {
@@ -110,9 +148,11 @@ public class UrlShortenerService {
         if (attempts >= 10) {
             throw new RuntimeException("Could not generate unique short code");
         }
-        shortToLong.put(shortCode,
-                new URLRecord(shortCode, realUrl, LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli()));
+        URLRecord urlRecord = new URLRecord(shortCode, realUrl, LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli());
+        shortUrlRepository.save(urlRecord);
+        shortToLong.put(shortCode, urlRecord);
         longToShort.put(realUrl, shortCode);
+        logger.log(Level.INFO, "saved url " + realUrl + " as " + shortCode);
         return shortCode;
     }
 
@@ -124,20 +164,25 @@ public class UrlShortenerService {
     }
 
     public Map<String, Long> computeStatistics () {
-        return  accessHistory.stream()
+        //shortToLong.forEach((key, value) -> System.out.println("ENTRY" + key + " - " + value));
+        //logger.info("DONE PRINTING LIST ...");
+         return  accessHistory.stream()
                 .map(AccessRecord::shortURL)
                 .collect(Collectors.groupingBy(
                         Function.identity(),
                         Collectors.counting()));
     }
 
-    public List<URLRecord> expireOldUrlRecords() {
+    public int expireOldUrlRecords() {
         long now = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        shortToLong.values().stream()
-                .map(urlRecord -> {
-                    if (urlRecord.createdAt() + expiryTime < now)
-                        urlRecord.
-                });
+        AtomicInteger removedCount = new AtomicInteger();
+        shortToLong.entrySet().removeIf(entry -> {
+            boolean expired = entry.getValue().createdAt() + lifeLimit < now;
+            if (expired)
+                removedCount.incrementAndGet();
+            return expired;
+            });
+        return removedCount.get();
     }
 }
 

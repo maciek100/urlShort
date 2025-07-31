@@ -38,7 +38,7 @@ public class UrlShortServiceTest {
         assertEquals(9, urlShortService.accessHistory.size());
 
         var x = urlShortService.computeStatistics();
-        for (Map.Entry<AccessRecord, Long> accessRecordLongEntry : x.entrySet()) {
+        for (Map.Entry<String, Long> accessRecordLongEntry : x.entrySet()) {
             System.out.println("Record : " + accessRecordLongEntry.toString());
         }
 

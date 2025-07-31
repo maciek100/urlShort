@@ -58,3 +58,7 @@ build/
 ### VS Code ###
 .vscode/
 >>>>>>> b8472f5 (stuff)
+
+
+# Ignore macOS system files
+.DS_Store

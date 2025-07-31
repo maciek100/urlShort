@@ -12,10 +12,13 @@ import urlShortener.dto.ShortenResponse;
 import urlShortener.exception.ShortenerException;
 import urlShortener.service.UrlShortenerService;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 @RestController
 @RequestMapping("/api/v1")
 public class UrlShortenerController {
-
+    private final Logger logger = Logger.getLogger(UrlShortenerController.class.getName());
     @Autowired
     private UrlShortenerService urlShortService;
 
@@ -28,18 +31,23 @@ public class UrlShortenerController {
     public ResponseEntity<ShortenResponse> shortenLongUrl(@Valid @RequestBody ShortenRequest request) {
         try {
             String shortUrl = urlShortService.shortenUrl(request.getUrl());
+            logger.log(Level.INFO, "Received " + request.getUrl() + " returned " + shortUrl);
             return ResponseEntity.ok(new ShortenResponse(shortUrl, "success", null));
         } catch (InvalidUrlException e) {
+            logger.log(Level.SEVERE, "Exception in Controller: " + e.getMessage());
             return ResponseEntity.badRequest()
                     .body(new ShortenResponse(null, "error", e.getMessage()));
         } catch (Exception e) {
+            logger.log(Level.SEVERE, "Exception in Controller: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(new ShortenResponse(null, "error", "Internal server error"));
         }
     }
 
+
     @GetMapping("/{shortCode}")
     public RedirectView expandShortUrl(@PathVariable String shortCode) {
+        System.out.println("CALLED TO expand " + shortCode);
         RedirectView redirectView = new RedirectView();
         try {
             String originalUrl = urlShortService.expandUrl(shortCode);

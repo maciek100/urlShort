@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - tinyurl-network
+
+  tinyurl:
+    build: .
+    container_name: tinyurl-service
+    ports:
+      - "8080:8080"
+      - "5005:5005"
+    volumes:
+      - ./stashingFolder:/urlShort/data
+    depends_on:
+      - mongodb
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/tinyurl?authSource=admin
+    networks:
+      - tinyurl-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  tinyurl-network:
+    driver: bridge
