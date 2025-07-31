@@ -39,8 +39,7 @@ public class StatisticsService {
                 aggregation,
                 "accessRecord",
                 URLAccessStats.class);
-        var data = results.getMappedResults();
-        logger.log(Level.INFO, "RETrieved " + data.size());
+        logger.log(Level.INFO, "Retrieved " + results.getMappedResults().size());
         results.getMappedResults()
                 .forEach(element -> logger.log(Level.INFO, element.toString()));
 

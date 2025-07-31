@@ -30,6 +30,7 @@ public class UrlShortenerController {
     @PostMapping("/shorten")
     public ResponseEntity<ShortenResponse> shortenLongUrl(@Valid @RequestBody ShortenRequest request) {
         try {
+            logger.log(Level.INFO, "Received PRE HASHING: " + request.getUrl());
             String shortUrl = urlShortService.shortenUrl(request.getUrl());
             logger.log(Level.INFO, "Received " + request.getUrl() + " returned " + shortUrl);
             return ResponseEntity.ok(new ShortenResponse(shortUrl, "success", null));
@@ -47,7 +48,7 @@ public class UrlShortenerController {
 
     @GetMapping("/{shortCode}")
     public RedirectView expandShortUrl(@PathVariable String shortCode) {
-        System.out.println("CALLED TO expand " + shortCode);
+        logger.log(Level.INFO, "CALLED TO expand " + shortCode);
         RedirectView redirectView = new RedirectView();
         try {
             String originalUrl = urlShortService.expandUrl(shortCode);
@@ -68,6 +69,7 @@ public class UrlShortenerController {
             redirectView.setUrl("/error/expired");
             redirectView.setStatusCode(HttpStatus.GONE);
         }
+        logger.log(Level.INFO, "REDIRECTING TO :" + redirectView.getUrl());
         return redirectView;
     }
 }

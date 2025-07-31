@@ -43,7 +43,7 @@ public class UrlShortenerService {
     }
 
     // Base URL for our service
-    private static final String BASE_URL = "https://tiny.ly/";
+    private static final String BASE_URL = "https://petite.ly/";
 
 
     // Core data structures

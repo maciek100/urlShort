@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>PetiteURL</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; }
+        input[type="text"] { width: 80%; padding: 8px; }
+        button { padding: 8px 12px; }
+        #result { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+<h1>PetiteURL</h1>
+<p>Enter a long URL to shorten:</p>
+<input type="text" id="longUrl" placeholder="https://example.com/long-stuff">
+<button onclick="shorten()">Shorten</button>
+
+<div id="result"></div>
+
+<script>
+    async function shorten() {
+      const longUrl = document.getElementById('longUrl').value;
+      console.log("UI Enter : " + longUrl);
+      if (!longUrl) return;
+      const response = await fetch('http://localhost:8080/urlShort/api/v1/shorten', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: longUrl })
+      });
+
+      const resultDiv = document.getElementById('result');
+      if (response.ok) {
+        const json = await response.json();
+        const shortCode = json.shortUrl || json.shortCode;
+        const redirectUrl = `http://localhost:8080/urlShort/api/v1/${shortCode}`;
+
+        resultDiv.innerHTML =
+          `Short URL: <a href="${redirectUrl}" target="_blank">${redirectUrl}</a>`;
+      } else {
+        resultDiv.textContent = 'Error: could not shorten URL.';
+      }
+    }
+</script>
+</body>
+</html>

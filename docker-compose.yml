@@ -11,11 +11,11 @@ services:
     volumes:
       - mongodb_data:/data/db
     networks:
-      - tinyurl-network
+      - petiteurl-network
 
-  tinyurl:
+  petiteurl-service:
     build: .
-    container_name: tinyurl-service
+    container_name: petiteurl-service
     ports:
       - "8080:8080"
       - "5005:5005"
@@ -24,13 +24,22 @@ services:
     depends_on:
       - mongodb
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/tinyurl?authSource=admin
+      SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/petiteurl?authSource=admin
     networks:
-      - tinyurl-network
+      - petiteurl-network
+
+  petiteurl-frontend:
+    build:
+      context: ./petiteurl-frontend
+    ports:
+      - "8081:80"
+    depends_on:
+      - petiteurl-service
+
 
 volumes:
   mongodb_data:
 
 networks:
-  tinyurl-network:
+  petiteurl-network:
     driver: bridge
