@@ -36,6 +36,14 @@ services:
     depends_on:
       - petiteurl-service
 
+  petiteurl-client:
+    build: ../petiteClient
+    depends_on:
+      - petiteurl-service
+    networks:
+      - petiteurl-network
+
+
 
 volumes:
   mongodb_data:

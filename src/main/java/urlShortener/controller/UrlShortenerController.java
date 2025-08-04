@@ -30,7 +30,6 @@ public class UrlShortenerController {
     @PostMapping("/shorten")
     public ResponseEntity<ShortenResponse> shortenLongUrl(@Valid @RequestBody ShortenRequest request) {
         try {
-            logger.log(Level.INFO, "Received PRE HASHING: " + request.getUrl());
             String shortUrl = urlShortService.shortenUrl(request.getUrl());
             logger.log(Level.INFO, "Received " + request.getUrl() + " returned " + shortUrl);
             return ResponseEntity.ok(new ShortenResponse(shortUrl, "success", null));
@@ -53,7 +52,7 @@ public class UrlShortenerController {
         try {
             String originalUrl = urlShortService.expandUrl(shortCode);
             if (originalUrl != null) {
-                redirectView.setUrl(originalUrl); //= new RedirectView(originalUrl);
+                redirectView.setUrl(originalUrl);
                 redirectView.setStatusCode(HttpStatus.FOUND); // 302 redirect
             } else {
                 redirectView.setUrl("/error/not-found");
@@ -61,7 +60,6 @@ public class UrlShortenerController {
             }
         } catch (ShortenerException.UrlNotFoundException e) {
             // Redirect to a "not found" page or return error
-            //RedirectView redirectView = new RedirectView();
             redirectView.setUrl("/error/not-found");
             redirectView.setStatusCode(HttpStatus.NOT_FOUND);
         } catch (ShortenerException.UrlExpiredException e) {
@@ -71,5 +69,10 @@ public class UrlShortenerController {
         }
         logger.log(Level.INFO, "REDIRECTING TO :" + redirectView.getUrl());
         return redirectView;
+    }
+
+    @GetMapping("/cache_size")
+    public ResponseEntity<Integer> getCacheSize() {
+        return ResponseEntity.ok(urlShortService.getCacheSize());
     }
 }

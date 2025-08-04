@@ -11,8 +11,8 @@ import urlShortener.repository.AccessRecordRepository;
 import urlShortener.repository.ShortUrlRepository;
 
 import java.io.*;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+//import java.nio.file.Path;
+//import java.nio.file.Paths;
 import java.rmi.AccessException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -51,8 +51,8 @@ public class UrlShortenerService {
     private Map<String, String> longToShort;      // originalUrl -> shortCode
     List<AccessRecord> accessHistory;
     // File for persistence
-    @Value("${short.service.storage.file.name}")
-    private String DATA_FILE;
+    //@Value("${short.service.storage.file.name}")
+    //private String DATA_FILE;
     @Value("${keep.record.alive}")
     private long lifeLimit;
 
@@ -82,7 +82,7 @@ public class UrlShortenerService {
 
     /**
      * Load data from file (if exists)
-     */
+
     private void loadFromFile() {
         Path path = Paths.get("/urlShort/data","backup_file");
         File file = path.toFile();
@@ -101,10 +101,11 @@ public class UrlShortenerService {
             this.longToShort = new HashMap<>();
         }
     }
+    */
 
     /**
      * Save data to file
-     */
+
     public void saveToFile() {
         logger.log(Level.INFO, "Attempting to save URLRecords to a file " + DATA_FILE);
         Path path = Paths.get("/urlShort/data","backup_file");
@@ -119,7 +120,7 @@ public class UrlShortenerService {
         File f = new File(DATA_FILE);
         logger.log(Level.INFO,"Created File " + f.getAbsolutePath() + " of size " + f.length());
     }
-
+*/
     public String expandUrl (String shortUrl) {
         if (shortToLong.containsKey(shortUrl)) {
             AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
@@ -131,7 +132,6 @@ public class UrlShortenerService {
             else {
                 logger.log(Level.WARNING, "URL for " + shortUrl + " not found in the repository.");
             }
-            //return shortToLong.get(shortUrl).originalURL();
         }
         return null;
     }
@@ -164,8 +164,6 @@ public class UrlShortenerService {
     }
 
     public Map<String, Long> computeStatistics () {
-        //shortToLong.forEach((key, value) -> System.out.println("ENTRY" + key + " - " + value));
-        //logger.info("DONE PRINTING LIST ...");
          return  accessHistory.stream()
                 .map(AccessRecord::shortURL)
                 .collect(Collectors.groupingBy(
@@ -183,6 +181,10 @@ public class UrlShortenerService {
             return expired;
             });
         return removedCount.get();
+    }
+
+    public int getCacheSize () {
+        return shortToLong.size();
     }
 }
 

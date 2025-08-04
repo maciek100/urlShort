@@ -21,7 +21,7 @@ public class ScheduledTasks {
 
     @Scheduled(cron = "0 0/2 * * * *")
     public void runStatisticsMaintenance() {
-        logger.info("Computing shallow statistics: " +  LocalDateTime.now());
+        logger.info("Computing rudimentary statistics: " +  LocalDateTime.now());
         statisticsService.computeStatistics(LocalDateTime.now().minusDays(4), LocalDateTime.now());
 
         LocalDateTime time = LocalDateTime.now();
