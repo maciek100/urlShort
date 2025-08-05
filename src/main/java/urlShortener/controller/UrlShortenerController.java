@@ -70,9 +70,4 @@ public class UrlShortenerController {
         logger.log(Level.INFO, "REDIRECTING TO :" + redirectView.getUrl());
         return redirectView;
     }
-
-    @GetMapping("/cache_size")
-    public ResponseEntity<Integer> getCacheSize() {
-        return ResponseEntity.ok(urlShortService.getCacheSize());
-    }
 }

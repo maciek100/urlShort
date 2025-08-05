@@ -1,6 +1,7 @@
 package urlShortener.service;
 
 import jakarta.annotation.PostConstruct;
+import net.spy.memcached.MemcachedClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
@@ -10,18 +11,11 @@ import urlShortener.model.URLRecord;
 import urlShortener.repository.AccessRecordRepository;
 import urlShortener.repository.ShortUrlRepository;
 
-import java.io.*;
-//import java.nio.file.Path;
-//import java.nio.file.Paths;
-import java.rmi.AccessException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 import java.util.logging.Logger;
 import java.util.logging.Level;
-import java.util.stream.Collectors;
 
 /**
  * Simple TinyURL Service - Step by Step Implementation
@@ -36,36 +30,15 @@ public class UrlShortenerService {
     ShortUrlRepository shortUrlRepository;
     @Autowired
     AccessRecordRepository accessRecordRepository;
+    @Autowired
+    private MemcachedClient memcachedClient;
 
     @PostConstruct
     public void retrievePreviousRunData() {
-        //this.loadFromFile();
+       //TODO: determine if we still need this ...
     }
 
-    // Base URL for our service
-    private static final String BASE_URL = "https://petite.ly/";
-
-
-    // Core data structures
-    private Map<String, URLRecord> shortToLong;    // shortCode -> URLRecord
-    private Map<String, String> longToShort;      // originalUrl -> shortCode
-    //List<AccessRecord> accessHistory;
-    // File for persistence
-    //@Value("${short.service.storage.file.name}")
-    //private String DATA_FILE;
-    @Value("${keep.record.alive}")
-    private long lifeLimit;
-
-    /**
-     * URLRecord - stores all information about a shortened URL
-     */
-
-    public UrlShortenerService() {
-        this.shortToLong = new HashMap<>();
-        this.longToShort = new HashMap<>();
-        //this.accessHistory = new ArrayList<>();
-    }
-
+    //public UrlShortenerService() {}
 
     public void warmupCashesFromRepository(List<URLRecord> listOfRecords) {
         if (listOfRecords.isEmpty()) {
@@ -73,118 +46,76 @@ public class UrlShortenerService {
         }
         listOfRecords
                 .forEach(record -> {
-                    shortToLong.put(record.shortCode(), record);
-                    longToShort.put(record.originalURL(), record.shortCode());
+                    memcachedClient.add("short:" + record.shortCode(), 3600, record);
                     logger.log(Level.INFO, record.toString());
                 });
     }
 
 
-    /**
-     * Load data from file (if exists)
 
-    private void loadFromFile() {
-        Path path = Paths.get("/urlShort/data","backup_file");
-        File file = path.toFile();
-        if (!file.exists()) {
-            logger.info("No existing data file found. Starting fresh.");
-            return;
-        }
-
-        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(file))) {
-            this.shortToLong = (Map<String, URLRecord>) ois.readObject();
-            this.longToShort = (Map<String, String>) ois.readObject();
-            logger.info("Loaded " + shortToLong.size() + " URLs from file.");
-        } catch (IOException | ClassNotFoundException e) {
-            logger.log(Level.SEVERE, "Error loading data from file: " +  e.getMessage());
-            this.shortToLong = new HashMap<>();
-            this.longToShort = new HashMap<>();
-        }
-    }
-    */
-
-    /**
-     * Save data to file
-
-    public void saveToFile() {
-        logger.log(Level.INFO, "Attempting to save URLRecords to a file " + DATA_FILE);
-        Path path = Paths.get("/urlShort/data","backup_file");
-        File file = path.toFile();
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(file))) {
-            oos.writeObject(shortToLong);
-            oos.writeObject(longToShort);
-            logger.log(Level.INFO,"Saved " + shortToLong.size() + " URLs to file.");
-        } catch (IOException e) {
-            logger.log(Level.SEVERE, "Error saving data to file: " + e.getMessage());
-        }
-        File f = new File(DATA_FILE);
-        logger.log(Level.INFO,"Created File " + f.getAbsolutePath() + " of size " + f.length());
-    }
-*/
     public String expandUrl (String shortUrl) {
-        if (shortToLong.containsKey(shortUrl)) {
-            AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
-            //accessHistory.add(accessRecord);
-            accessRecordRepository.save(accessRecord);
-            Optional<URLRecord> optRecord = shortUrlRepository.findById(shortUrl);
-            if (optRecord.isPresent())
-                return optRecord.get().originalURL();
-            else {
-                logger.log(Level.WARNING, "URL for " + shortUrl + " not found in the repository.");
-            }
+        URLRecord existing = getUrlRecord(shortUrl);
+        if (existing == null) {
+            logger.log(Level.WARNING, "URL for " + shortUrl + " not found in the repository.");
+            return null;
         }
-        return null;
+        AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
+        accessRecordRepository.save(accessRecord);
+        return existing.originalURL();
+    }
+
+    public String getShortCodeFromLongURL(String longUrl) {
+        String cacheKey = "long:" + longUrl;
+        Object shortUrlObj = memcachedClient.get(cacheKey);
+        return shortUrlObj != null ? shortUrlObj.toString() : null;
     }
 
     public String shortenUrl(String realUrl) {
-        if (longToShort.containsKey(realUrl))
-            return longToShort.get(realUrl);
+        String cacheKey = "long:" + realUrl;
+        Object cachedShortURL = memcachedClient.get(cacheKey);
+        if (cachedShortURL != null)
+            return cachedShortURL.toString();
+        //produce NEW short URL
+        String shortCode = generateShortCodeWrapper();
+        URLRecord urlRecord = new URLRecord(shortCode, realUrl, LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli());
+        shortUrlRepository.save(urlRecord);
+        cacheMapping(realUrl, shortCode, urlRecord);
+        logger.log(Level.INFO, "saved url " + realUrl + " as " + shortCode);
+        return shortCode;
+    }
+
+    private String generateShortCodeWrapper () {
         String shortCode;
         int attempts = 0;
         do {
             shortCode = generateShortCode();
             attempts++;
-        } while (shortToLong.containsKey(shortCode) && attempts < 10);
+        } while (memcachedClient.get("short:" + shortCode) != null && attempts < 10);
         if (attempts >= 10) {
-            throw new RuntimeException("Could not generate unique short code");
+            throw new RuntimeException("Could not generate UNIQUE short code");
         }
-        URLRecord urlRecord = new URLRecord(shortCode, realUrl, LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli());
-        shortUrlRepository.save(urlRecord);
-        shortToLong.put(shortCode, urlRecord);
-        longToShort.put(realUrl, shortCode);
-        logger.log(Level.INFO, "saved url " + realUrl + " as " + shortCode);
         return shortCode;
     }
 
-    private static String generateShortCode() {
+    private String generateShortCode() {
         return UUID.randomUUID()
                 .toString()
                 .replace("-", "")
                 .substring(0,6);
     }
-/*
-    public Map<String, Long> computeStatistics () {
-         return  accessHistory.stream()
-                .map(AccessRecord::shortURL)
-                .collect(Collectors.groupingBy(
-                        Function.identity(),
-                        Collectors.counting()));
-    }
-*/
-    public int expireOldUrlRecords() {
-        long now = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        AtomicInteger removedCount = new AtomicInteger();
-        shortToLong.entrySet().removeIf(entry -> {
-            boolean expired = entry.getValue().createdAt() + lifeLimit < now;
-            if (expired)
-                removedCount.incrementAndGet();
-            return expired;
-            });
-        return removedCount.get();
+
+    private void cacheMapping(String longUrl, String shortUrl, URLRecord record) {
+        memcachedClient.set("long:" + longUrl, 3600, shortUrl);
+        memcachedClient.set("short:" + shortUrl, 3600, record);
     }
 
-    public int getCacheSize () {
-        return shortToLong.size();
+    private URLRecord getUrlRecord(String shortUrl) {
+        Object record = memcachedClient.get("short:" + shortUrl);
+        if (record != null)
+            return (URLRecord) record;
+        //cache does not have the key ... let's go to repository
+        Optional<URLRecord> urlRecordOptional = shortUrlRepository.findById(shortUrl);
+        return urlRecordOptional.orElse(null);
     }
 }
 

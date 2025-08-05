@@ -16,40 +16,20 @@ import java.util.logging.Logger;
 public class ScheduledTasks {
 
     @Autowired
-    UrlShortenerService urlShortService;
-    @Autowired
     StatisticsService statisticsService;
 
     private static final Logger logger = Logger.getLogger(ScheduledTasks.class.getName());
 
     @Scheduled(cron = "0 0/2 * * * *")
     public void runStatisticsMaintenance() {
-        logger.info("Computing rudimentary statistics: " +  LocalDateTime.now());
-        statisticsService.computeStatisticsForDefinedTimePeriod(Duration.ofHours(1));
-
-        LocalDateTime time = LocalDateTime.now();
+        LocalDateTime dateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss", Locale.ENGLISH);
-        String formatted = time.format(formatter).toLowerCase();
-
-        logger.info("STATISTICS at " + formatted);
+        String formattedDateTime = dateTime.format(formatter).toLowerCase();
+        logger.info("Computing rudimentary statistics: " +  dateTime);
+        logger.info("STATISTICS at " + formattedDateTime);
         Map<String, URLAccessStats> results =  statisticsService.computeStatisticsForDefinedTimePeriod(Duration.ofDays(100000L));
-        results.entrySet().stream()
-                .forEach(entry -> System.out.println(entry.getValue().toString()));
+        results.forEach((key, value) -> System.out.println(value.toString()));
     }
 
-    //This task removes URLRecords which were created "before" the expiration time.
-    // It does not take under the account the last time the Record was used.
-    //TODO: it is probably not an optimal strategy, RETHINK IT. (or have AI to do it :) )
-    //@Scheduled(cron = "0 0/3 * * * *")
-    public void purgeExpiredURLRecords() {
-        int expiredEntries = urlShortService.expireOldUrlRecords();
-        logger.info("Purged " +  expiredEntries + "  expired URLRecords.");
-    }
-
-    // Alternative: Run every hour using fixedRate
-    @Scheduled(fixedRate = 3600000) // 3600000 ms = 1 hour
-    public void runHourlyTaskAlternative() {
-        statisticsService.computeStatisticsForDefinedTimePeriod(Duration.ofHours(1));
-    }
-
+    //TODO: a scheduled task retire unused Records from the database.
 }

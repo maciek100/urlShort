@@ -43,6 +43,15 @@ services:
     networks:
       - petiteurl-network
 
+  memcached:
+    image: memcached:latest
+    container_name: memcached
+    ports:
+      - "11211:11211"
+    networks:
+      - petiteurl-network
+
+
 
 
 volumes:

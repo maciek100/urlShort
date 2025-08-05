@@ -6,11 +6,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-import urlShortener.dto.TopUrlStats;
 
 import java.util.List;
 import java.util.Map;
@@ -22,26 +20,7 @@ public class StatisticsController {
     @Autowired
     private MongoTemplate mongoTemplate;
 
-    @GetMapping("/topZZZ")
-    public ResponseEntity<?> debugTopAggregation() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.group("shortURL").count().as("count"),
-                Aggregation.sort(Sort.by(Sort.Direction.DESC, "count")),
-                Aggregation.limit(10),
-                Aggregation.project("count").and("_id").as("shortUrl"),
-                Aggregation.lookup("urlRecord", "shortUrl", "_id", "urlInfo"),
-                Aggregation.unwind("urlInfo", true),
-                Aggregation.project("shortUrl", "count").and("urlInfo.originalURL").as("originalUrl")
-        );
-
-        AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "accessRecord", Document.class);
-
-        results.getMappedResults().forEach(doc -> System.out.println("AGG REG OUTPUT: " + doc.toJson()));
-
-        return ResponseEntity.ok(results.getMappedResults());
-    }
-
-
+    //find 10 most used URLs.
     @GetMapping("/top")
     public List<Map<String, Object>> getTopUrlsWithOriginals () {
         Aggregation aggregation = Aggregation.newAggregation(

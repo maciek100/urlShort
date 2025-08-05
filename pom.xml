@@ -64,7 +64,14 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webflux</artifactId>
 		</dependency>
-    </dependencies>
+		<!-- In petiteurl-service/pom.xml -->
+		<dependency>
+			<groupId>net.spy</groupId>
+			<artifactId>spymemcached</artifactId>
+			<version>2.12.3</version>
+		</dependency>
+
+	</dependencies>
 
 	<build>
 		<plugins>
