@@ -8,27 +8,24 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 import urlShortener.dto.URLAccessStats;
 import urlShortener.model.AccessRecord;
-import urlShortener.repository.AccessRecordRepository;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 @Service
 public class StatisticsService {
     Logger logger = Logger.getLogger(StatisticsService.class.getName());
     @Autowired
-    AccessRecordRepository accessRecordRepository;
-    @Autowired
     MongoTemplate mongoTemplate;
 
-    public void computeStatistics (LocalDateTime from, LocalDateTime to) {
-        LocalDateTime fromX = LocalDateTime.of(2025, 7, 1, 0, 0);
-        LocalDateTime toX = LocalDateTime.of(2025, 7, 30, 23, 59, 59);
-
+    private Map<String, URLAccessStats> computeStatistics (LocalDateTime from, LocalDateTime to) {
         Aggregation aggregation = Aggregation.newAggregation(
-            Aggregation.match(Criteria.where("accessTime").gte(fromX).lte(toX)),
+            Aggregation.match(Criteria.where("accessTime").gte(from).lte(to)),
             Aggregation.group("shortURL")
                     .count().as("total")
                     .min("accessTime").as("firstAccess")
@@ -39,17 +36,18 @@ public class StatisticsService {
                 aggregation,
                 "accessRecord",
                 URLAccessStats.class);
-        logger.log(Level.INFO, "Retrieved " + results.getMappedResults().size());
-        results.getMappedResults()
-                .forEach(element -> logger.log(Level.INFO, element.toString()));
-
-        //List<AccessRecord> recordTimeSlice = accessRecordRepository.findByAccessTimeBetween(from, to);
-        //logger.log(Level.INFO, "Between " + from + " and " + to + " " + recordTimeSlice.size());
+        logger.log(Level.INFO, "RETRIEVED STATISTICS " + results.getMappedResults().size());
+        return results.getMappedResults()
+                .stream()
+                .collect(Collectors.toMap(
+                        URLAccessStats::_id,
+                        Function.identity()
+                ));
     }
 
-    public void computeStatisticsForLastHour () {
+    public Map<String, URLAccessStats> computeStatisticsForDefinedTimePeriod (Duration duration) {
         LocalDateTime now = LocalDateTime.now();
-        computeStatistics(now.minusHours(1), now);
+        return computeStatistics(now.minusHours(duration.toHours()), now);
     }
 
 }

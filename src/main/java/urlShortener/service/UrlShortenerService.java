@@ -49,7 +49,7 @@ public class UrlShortenerService {
     // Core data structures
     private Map<String, URLRecord> shortToLong;    // shortCode -> URLRecord
     private Map<String, String> longToShort;      // originalUrl -> shortCode
-    List<AccessRecord> accessHistory;
+    //List<AccessRecord> accessHistory;
     // File for persistence
     //@Value("${short.service.storage.file.name}")
     //private String DATA_FILE;
@@ -63,7 +63,7 @@ public class UrlShortenerService {
     public UrlShortenerService() {
         this.shortToLong = new HashMap<>();
         this.longToShort = new HashMap<>();
-        this.accessHistory = new ArrayList<>();
+        //this.accessHistory = new ArrayList<>();
     }
 
 
@@ -124,7 +124,7 @@ public class UrlShortenerService {
     public String expandUrl (String shortUrl) {
         if (shortToLong.containsKey(shortUrl)) {
             AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
-            accessHistory.add(accessRecord);
+            //accessHistory.add(accessRecord);
             accessRecordRepository.save(accessRecord);
             Optional<URLRecord> optRecord = shortUrlRepository.findById(shortUrl);
             if (optRecord.isPresent())
@@ -162,7 +162,7 @@ public class UrlShortenerService {
                 .replace("-", "")
                 .substring(0,6);
     }
-
+/*
     public Map<String, Long> computeStatistics () {
          return  accessHistory.stream()
                 .map(AccessRecord::shortURL)
@@ -170,7 +170,7 @@ public class UrlShortenerService {
                         Function.identity(),
                         Collectors.counting()));
     }
-
+*/
     public int expireOldUrlRecords() {
         long now = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         AtomicInteger removedCount = new AtomicInteger();

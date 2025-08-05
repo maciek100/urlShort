@@ -18,7 +18,7 @@ public class UrlShortServiceTest {
 //        urlShortService.shortenUrl("http://www.facebook.com");
 //        urlShortService.shortenUrl("http://www.squarespace.com");
 //    }
-    @Test
+   /* @Test
     public void testShorteningUrls () {
         String urlString1 = "http://www.squarespace.com";
         String urlString2 = "http://www.squarespace2.com";
@@ -53,7 +53,7 @@ public class UrlShortServiceTest {
         assertEquals(ac1, ac2);
     }
 
-    /*
+
     public static void main(String[] args) {
         UrlShortService service = new UrlShortService();
 
