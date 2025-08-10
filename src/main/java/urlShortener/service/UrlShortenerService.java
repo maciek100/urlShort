@@ -11,8 +11,11 @@ import urlShortener.model.URLRecord;
 import urlShortener.repository.AccessRecordRepository;
 import urlShortener.repository.ShortUrlRepository;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.TemporalAmount;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -33,6 +36,9 @@ public class UrlShortenerService {
     @Autowired
     private MemcachedClient memcachedClient;
 
+    @Value("${time.to.live.seconds}")
+    long timeToLive;
+
     @PostConstruct
     public void retrievePreviousRunData() {
        //TODO: determine if we still need this ...
@@ -47,6 +53,7 @@ public class UrlShortenerService {
         listOfRecords
                 .forEach(record -> {
                     memcachedClient.add("short:" + record.shortCode(), 3600, record);
+                    memcachedClient.add("long:" + record.originalURL(), 3600, record.shortCode());
                     logger.log(Level.INFO, record.toString());
                 });
     }
@@ -73,11 +80,16 @@ public class UrlShortenerService {
     public String shortenUrl(String realUrl) {
         String cacheKey = "long:" + realUrl;
         Object cachedShortURL = memcachedClient.get(cacheKey);
-        if (cachedShortURL != null)
+        if (cachedShortURL != null) {
+            logger.log(Level.INFO, "ALREADY IN {" + realUrl + " -> " + cachedShortURL + "}");
+            logger.log(Level.INFO, "FOUND CACHED SHORT -> " + cachedShortURL.toString());
             return cachedShortURL.toString();
+        }
         //produce NEW short URL
         String shortCode = generateShortCodeWrapper();
-        URLRecord urlRecord = new URLRecord(shortCode, realUrl, LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli());
+        Instant creation = Instant.now();
+        Instant termination = creation.plus(Duration.ofSeconds(timeToLive));
+        URLRecord urlRecord = new URLRecord(shortCode, realUrl, creation, termination);
         shortUrlRepository.save(urlRecord);
         cacheMapping(realUrl, shortCode, urlRecord);
         logger.log(Level.INFO, "saved url " + realUrl + " as " + shortCode);

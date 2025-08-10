@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/v1/stats")
@@ -36,11 +37,12 @@ public class StatisticsController {
                         .and("urlInfo.originalURL").as("originalUrl")
         );
         AggregationResults<Document> results = mongoTemplate.aggregate(aggregation, "accessRecord", Document.class);
+
         return results.getMappedResults().stream()
                 .map(doc -> Map.of(
-                        "shortUrl", doc.getString("shortUrl"),
-                        "count", doc.get("count"),
-                        "originalUrl", doc.getString("originalUrl")
+                        "shortUrl", Optional.ofNullable(doc.getString("shortUrl")).orElse("short is NULL"),
+                        "count", Optional.ofNullable(doc.get("count")).orElse("count is NULL"),
+                        "originalUrl", Optional.ofNullable(doc.getString("originalUrl")).orElse("original is NULL")
                 ))
                 .toList();
     }

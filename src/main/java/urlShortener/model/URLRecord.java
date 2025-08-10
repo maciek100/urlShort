@@ -1,13 +1,22 @@
 package urlShortener.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.CompoundIndexes;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
 
-@Document(collection = "urlRecord")
-public record URLRecord(@Id String shortCode, String originalURL, long createdAt) implements Serializable {
+//@Document(collection = "urlRecord")
+@Document("urlRecord")
+public record URLRecord(
+        @Id String shortCode,
+        String originalURL,
+        Instant createdAt,
+        Instant expiresAt) implements Serializable {
     public boolean equals(Object otherObject) {
         if (otherObject == null)
             return false;
