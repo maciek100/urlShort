@@ -7,7 +7,6 @@ import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.stereotype.Service;
 import urlShortener.dto.URLAccessStats;
-import urlShortener.model.AccessRecord;
 
 import java.time.Duration;
 import java.time.LocalDateTime;

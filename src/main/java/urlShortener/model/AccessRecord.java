@@ -9,12 +9,16 @@ import java.util.Objects;
 public record AccessRecord(String shortURL, LocalDateTime accessTime) {
     @Override
     public boolean equals (Object object) {
-        if (this == object)
-            return true;
-        if (!(object instanceof AccessRecord otherRecord))
-            return false;
+        boolean result;
+        if (this == object) {
+            result = true;
+        } else if (!(object instanceof AccessRecord otherRecord)) {
+            result = false;
+        } else {
+            result = this.shortURL.equals(otherRecord.shortURL);
+        }
 
-        return this.shortURL.equals(otherRecord.shortURL);
+        return result;
     }
 
     @Override

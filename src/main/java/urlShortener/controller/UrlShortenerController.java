@@ -30,7 +30,7 @@ public class UrlShortenerController {
     @PostMapping("/shorten")
     public ResponseEntity<ShortenResponse> shortenLongUrl(@Valid @RequestBody ShortenRequest request) {
         try {
-            String shortUrl = urlShortService.shortenUrl(request.getUrl());
+            var shortUrl = urlShortService.shortenUrl(request.getUrl());
             logger.log(Level.INFO, "Received " + request.getUrl() + " returned " + shortUrl);
             return ResponseEntity.ok(new ShortenResponse(shortUrl, "success", null));
         } catch (InvalidUrlException e) {

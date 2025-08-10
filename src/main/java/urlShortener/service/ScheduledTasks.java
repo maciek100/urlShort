@@ -28,7 +28,7 @@ public class ScheduledTasks {
         logger.info("Computing rudimentary statistics: " +  dateTime);
         logger.info("STATISTICS at " + formattedDateTime);
         Map<String, URLAccessStats> results =  statisticsService.computeStatisticsForDefinedTimePeriod(Duration.ofDays(100000L));
-        results.forEach((key, value) -> System.out.println(value.toString()));
+        results.forEach((key, value) -> System.out.println(key + " : " + value.toString()));
     }
 
     //TODO: a scheduled task retire unused Records from the database.

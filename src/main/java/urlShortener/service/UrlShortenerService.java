@@ -1,6 +1,5 @@
 package urlShortener.service;
 
-import jakarta.annotation.PostConstruct;
 import net.spy.memcached.MemcachedClient;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -14,8 +13,6 @@ import urlShortener.repository.ShortUrlRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.TemporalAmount;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.logging.Level;
@@ -27,25 +24,29 @@ import java.util.logging.Level;
 @Service
 public class UrlShortenerService {
     private final Logger logger = Logger.getLogger(UrlShortenerService.class.getName());
-    @Autowired
-    private Environment environment;
-    @Autowired
+    //@Autowired
+    //private Environment environment;
+    //@Autowired
     ShortUrlRepository shortUrlRepository;
-    @Autowired
+    //@Autowired
     AccessRecordRepository accessRecordRepository;
-    @Autowired
+    //@Autowired
     private MemcachedClient memcachedClient;
 
     @Value("${time.to.live.seconds}")
     long timeToLive;
 
-    @PostConstruct
-    public void retrievePreviousRunData() {
-       //TODO: determine if we still need this ...
+    @Autowired
+    public UrlShortenerService(
+            ShortUrlRepository shortUrlRepository,
+            AccessRecordRepository accessRecordRepository,
+            MemcachedClient memcachedClient
+            //long timeToLive
+    ) {
+        this.shortUrlRepository = shortUrlRepository;
+        this.accessRecordRepository = accessRecordRepository;
+        this.memcachedClient = memcachedClient;
     }
-
-    //public UrlShortenerService() {}
-
     public void warmupCashesFromRepository(List<URLRecord> listOfRecords) {
         if (listOfRecords.isEmpty()) {
             logger.log(Level.INFO, "No previous records detected. Nothing to warm up.");
@@ -71,18 +72,17 @@ public class UrlShortenerService {
         return existing.originalURL();
     }
 
-    public String getShortCodeFromLongURL(String longUrl) {
-        String cacheKey = "long:" + longUrl;
-        Object shortUrlObj = memcachedClient.get(cacheKey);
-        return shortUrlObj != null ? shortUrlObj.toString() : null;
-    }
+//    public String getShortCodeFromLongURL(String longUrl) {
+//        String cacheKey = "long:" + longUrl;
+//        Object shortUrlObj = memcachedClient.get(cacheKey);
+//        return shortUrlObj != null ? shortUrlObj.toString() : null;
+//    }
 
     public String shortenUrl(String realUrl) {
-        String cacheKey = "long:" + realUrl;
+        var cacheKey = "long:" + realUrl;
         Object cachedShortURL = memcachedClient.get(cacheKey);
         if (cachedShortURL != null) {
-            logger.log(Level.INFO, "ALREADY IN {" + realUrl + " -> " + cachedShortURL + "}");
-            logger.log(Level.INFO, "FOUND CACHED SHORT -> " + cachedShortURL.toString());
+            logger.log(Level.INFO, "FOUND CACHED SHORT url -> " + cachedShortURL + " for real URL " + realUrl);
             return cachedShortURL.toString();
         }
         //produce NEW short URL
