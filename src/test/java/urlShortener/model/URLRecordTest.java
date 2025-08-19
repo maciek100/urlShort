@@ -15,7 +15,7 @@ public class URLRecordTest {
         Instant created2 = Instant.now().minus(Duration.ofMinutes(6));
         Instant expires1 = Instant.now().minus(Duration.ofMinutes(2));
         Instant expires2 = Instant.now().minus(Duration.ofMinutes(3));
-        URLRecord record1 = new URLRecord("abc"," http://google.com", created1, expires1);
+        var record1 = new URLRecord("abc"," http://google.com", created1, expires1);
         URLRecord record2 = new URLRecord("abc"," http://google.com", created2, expires2);
         URLRecord record3 = new URLRecord("abc"," http://googlish.com", created2, expires1);
         assertEquals(record1, record2);

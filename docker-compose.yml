@@ -24,6 +24,9 @@ services:
       - mongodb
     environment:
       SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/petiteurl?authSource=admin
+      JAVA_TOOL_OPTIONS: "--add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+
+
     networks:
       - petiteurl-network
 

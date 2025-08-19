@@ -1,10 +1,17 @@
 package urlShortener.service;
 
 import net.spy.memcached.MemcachedClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+import urlShortener.dto.CacheStats;
 import urlShortener.model.AccessRecord;
 import urlShortener.model.URLRecord;
 import urlShortener.repository.AccessRecordRepository;
@@ -13,9 +20,7 @@ import urlShortener.repository.ShortUrlRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.logging.Logger;
-import java.util.logging.Level;
+import java.util.UUID;
 
 /**
  * Simple TinyURL Service - Step by Step Implementation
@@ -23,77 +28,76 @@ import java.util.logging.Level;
  */
 @Service
 public class UrlShortenerService {
-    private final Logger logger = Logger.getLogger(UrlShortenerService.class.getName());
-    //@Autowired
-    //private Environment environment;
-    //@Autowired
-    ShortUrlRepository shortUrlRepository;
-    //@Autowired
-    AccessRecordRepository accessRecordRepository;
-    //@Autowired
-    private MemcachedClient memcachedClient;
-
-    @Value("${time.to.live.seconds}")
-    long timeToLive;
+    private final Logger logger = LoggerFactory.getLogger(UrlShortenerService.class.getName());
+    private final ShortUrlRepository shortUrlRepository;
+    private final AccessRecordRepository accessRecordRepository;
+    private final MemcachedClient memcachedClient;
+    private final long timeToLive;
 
     @Autowired
     public UrlShortenerService(
             ShortUrlRepository shortUrlRepository,
             AccessRecordRepository accessRecordRepository,
-            MemcachedClient memcachedClient
-            //long timeToLive
-    ) {
+            MemcachedClient memcachedClient,
+            @Value("${time.to.live.seconds}") long timeToLive) {
         this.shortUrlRepository = shortUrlRepository;
         this.accessRecordRepository = accessRecordRepository;
         this.memcachedClient = memcachedClient;
-    }
-    public void warmupCashesFromRepository(List<URLRecord> listOfRecords) {
-        if (listOfRecords.isEmpty()) {
-            logger.log(Level.INFO, "No previous records detected. Nothing to warm up.");
-        }
-        listOfRecords
-                .forEach(record -> {
-                    memcachedClient.add("short:" + record.shortCode(), 3600, record);
-                    memcachedClient.add("long:" + record.originalURL(), 3600, record.shortCode());
-                    logger.log(Level.INFO, record.toString());
-                });
+        this.timeToLive = timeToLive;
     }
 
-
-
-    public String expandUrl (String shortUrl) {
-        URLRecord existing = getUrlRecord(shortUrl);
-        if (existing == null) {
-            logger.log(Level.WARNING, "URL for " + shortUrl + " not found in the repository.");
-            return null;
-        }
-        AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
-        accessRecordRepository.save(accessRecord);
-        return existing.originalURL();
+    public Mono<Void> warmupCashesFromRepository(Flux<URLRecord> records) {
+        return records
+                .flatMap(this::warmupCache)
+                .doOnNext(v -> logger.info("Record warmed up"))
+                .then() // ensures we return Mono<Void>
+                .doOnSuccess(v -> logger.info("All records warmed up"))
+                .doOnError(err -> logger.error("Error during cache warmup", err));
     }
 
-//    public String getShortCodeFromLongURL(String longUrl) {
-//        String cacheKey = "long:" + longUrl;
-//        Object shortUrlObj = memcachedClient.get(cacheKey);
-//        return shortUrlObj != null ? shortUrlObj.toString() : null;
-//    }
+    private Mono<Void> warmupCache(URLRecord record) {
+        return Mono.fromRunnable(() -> {
+            memcachedClient.add("short:" + record.getShortCode(), 3600, record);
+            memcachedClient.add("long:" + record.getOriginalURL(), 3600, record.getShortCode());
+        });
+    }
 
-    public String shortenUrl(String realUrl) {
+    public Mono<String> expandUrl (String shortUrl) {
+        return getUrlRecord(shortUrl)
+                .flatMap(existing -> {
+                    if (existing.isExpired()) {
+                        // return a "not found" style error -> 404
+                        return Mono.error(new ResponseStatusException(
+                                HttpStatus.GONE, "Short URL [" + shortUrl + "] has expired"));
+                    }
+                    logger.info("Found Record {}", existing);
+                    AccessRecord accessRecord = new AccessRecord(shortUrl, LocalDateTime.now());
+                    return accessRecordRepository.save(accessRecord)
+                            .thenReturn(existing.getOriginalURL());
+                })
+                .switchIfEmpty(Mono.fromRunnable(() ->
+                        logger.warn("Short URL for {} not found in the repository.", shortUrl)
+                ).then(Mono.empty()));
+    }
+
+    public Mono<String> shortenUrl(String realUrl) {
         var cacheKey = "long:" + realUrl;
         Object cachedShortURL = memcachedClient.get(cacheKey);
         if (cachedShortURL != null) {
-            logger.log(Level.INFO, "FOUND CACHED SHORT url -> " + cachedShortURL + " for real URL " + realUrl);
-            return cachedShortURL.toString();
+            logger.info("FOUND CACHED SHORT url -> {} for real URL {}", cachedShortURL, realUrl);
+            return Mono.just(cachedShortURL.toString());
         }
         //produce NEW short URL
         String shortCode = generateShortCodeWrapper();
         Instant creation = Instant.now();
         Instant termination = creation.plus(Duration.ofSeconds(timeToLive));
         URLRecord urlRecord = new URLRecord(shortCode, realUrl, creation, termination);
-        shortUrlRepository.save(urlRecord);
-        cacheMapping(realUrl, shortCode, urlRecord);
-        logger.log(Level.INFO, "saved url " + realUrl + " as " + shortCode);
-        return shortCode;
+        return shortUrlRepository.save(urlRecord)
+                .doOnSuccess(saved -> {
+                    cacheMapping(realUrl, shortCode, urlRecord);
+                    logger.info("saved url {} as {}", realUrl, shortCode);
+                })
+                .map(URLRecord::getShortCode);
     }
 
     private String generateShortCodeWrapper () {
@@ -121,13 +125,36 @@ public class UrlShortenerService {
         memcachedClient.set("short:" + shortUrl, 3600, record);
     }
 
-    private URLRecord getUrlRecord(String shortUrl) {
+    private Mono<URLRecord> getUrlRecord(String shortUrl) {
         Object record = memcachedClient.get("short:" + shortUrl);
-        if (record != null)
-            return (URLRecord) record;
+        if (record != null) {
+            URLRecord urlRecord =  (URLRecord) record;
+            return Mono.just(urlRecord);
+        } else {
+            logger.warn("Record {} not in the cache", shortUrl);
+        }
         //cache does not have the key ... let's go to repository
-        Optional<URLRecord> urlRecordOptional = shortUrlRepository.findById(shortUrl);
-        return urlRecordOptional.orElse(null);
+        return shortUrlRepository.findById(shortUrl);
+        ////Mono<URLRecord> urlRecordOptional = shortUrlRepository.findById(shortUrl);
+        /////return urlRecordOptional.orElse(null);
+    }
+
+    // Reactive method to get current cache size
+    public Mono<CacheStats> getCacheSize() {
+        return Mono.fromCallable(() -> {
+                    int size = memcachedClient.getStats().values().stream()
+                            .mapToInt(innerMap -> {
+                                try {
+                                    return Integer.parseInt(innerMap.getOrDefault("curr_items", "0"));
+                                } catch (NumberFormatException ex) {
+                                    return 0;
+                                }
+                            })
+                            .sum();
+                    return new CacheStats(size, 200, "ok");
+                })
+                .subscribeOn(Schedulers.boundedElastic()) // runs blocking call safely
+                .onErrorResume(e -> Mono.just(new CacheStats(0, 500, e.getMessage())));
     }
 }
 

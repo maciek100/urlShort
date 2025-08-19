@@ -1,35 +1,76 @@
 package urlShortener.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import urlShortener.dto.URLAccessStats;
+import urlShortener.repository.ShortUrlRepository;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.Duration;
 import java.util.Locale;
-import java.util.Map;
-import java.util.logging.Logger;
 
 @Component
 public class ScheduledTasks {
 
-    @Autowired
-    StatisticsService statisticsService;
+    private final StatisticsService statisticsService;
+    private final ShortUrlRepository shortUrlRepository;
 
-    private static final Logger logger = Logger.getLogger(ScheduledTasks.class.getName());
+    private static final Logger logger = LoggerFactory.getLogger(ScheduledTasks.class.getName());
 
-    @Scheduled(cron = "0 0/2 * * * *")
+    public ScheduledTasks (StatisticsService statisticsService,
+                           ShortUrlRepository shortUrlRepository) {
+        this.statisticsService = statisticsService;
+        this.shortUrlRepository = shortUrlRepository;
+    }
+
+    //@Scheduled(cron = "0 0/12 * * * *")
     public void runStatisticsMaintenance() {
+        logger.info("HF statistics maintenance should be OFF");
         LocalDateTime dateTime = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss", Locale.ENGLISH);
         String formattedDateTime = dateTime.format(formatter).toLowerCase();
-        logger.info("Computing rudimentary statistics: " +  dateTime);
-        logger.info("STATISTICS at " + formattedDateTime);
-        Map<String, URLAccessStats> results =  statisticsService.computeStatisticsForDefinedTimePeriod(Duration.ofDays(100000L));
-        results.forEach((key, value) -> System.out.println(key + " : " + value.toString()));
+        logger.info("Computing rudimentary statistics: {}", dateTime);
+        logger.info("Statistics at {}", formattedDateTime);
+        statisticsService.computeStatisticsMapForPeriod(Duration.ofHours(1L))
+                .doOnNext(stats -> {
+                    logger.info("Computed stats for last hour: {}", stats.size());
+
+                })
+                .subscribe();
     }
 
-    //TODO: a scheduled task retire unused Records from the database.
+    //@Scheduled(fixedRate = 60000000) // every 60s
+    public void markExpiredRecords() {
+        logger.info("HF marking expired records should be OFF");
+        Instant now = Instant.now();
+        shortUrlRepository.findByExpiresAtBeforeAndExpiredFalse(now)
+                .flatMap(record -> {
+                    record.setExpired(true);
+                    return shortUrlRepository.save(record);
+                })
+                .subscribe();
+    }
+
+    // runs every 5 minutes
+    @Scheduled(fixedRate = 5 * 60 * 1000)
+    public void expireRandomUrls() {
+        logger.info("This MF, expire random urls is OK");
+        statisticsService.expireRandomUrlRecords(10)
+                .doOnTerminate(() -> logger.info("Finished expiring records"))
+                .subscribe(
+                        summary -> {
+                            System.out.println("===== ELIMINATION ROUND =====");
+                            System.out.println("Picked: " + summary.get("pickedIds"));
+                            System.out.println("Already expired: " + summary.get("alreadyExpired"));
+                            System.out.println("Newly expired: " + summary.get("newlyExpired"));
+                            System.out.println("=============================");
+                        },
+                        error -> logger.warn("Error expiring URLs: {}", error.getMessage())
+                );
+    }
+
+
 }

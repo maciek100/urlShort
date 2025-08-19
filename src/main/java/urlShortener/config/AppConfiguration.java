@@ -1,4 +1,4 @@
-package urlShortener;
+package urlShortener.config;
 
 import net.spy.memcached.MemcachedClient;
 import org.springframework.context.annotation.Bean;

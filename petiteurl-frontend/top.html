@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Top 10 Short URLs</title>
+    <title>Top Short URLs</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border: 1px solid #ddd; padding: 8px; }
         th { background-color: #f2f2f2; }
+        tr.expired { background-color: #f9d6d5; color: #777; } /* light red/pink row */
+        tr.expired a { pointer-events: none; color: #999; text-decoration: line-through; }
     </style>
 </head>
 <body>
-<h1>Top 10 Most Frequently Accessed Short URLs</h1>
+<h1>Top Most Frequently Accessed Short URLs</h1>
 <table id="statsTable">
     <thead>
     <tr>
@@ -22,27 +24,6 @@
     </thead>
     <tbody></tbody>
 </table>
-<!--
-<script>
-    fetch("http://localhost:8080/urlShort/api/v1/stats/top")
-      .then(response => response.json())
-      .then(data => {
-        const tbody = document.querySelector("#statsTable tbody");
-        data.forEach((entry, index) => {
-          const row = document.createElement("tr");
-          row.innerHTML = `
-            <td>${index + 1}</td>
-            <td><a href="http://localhost:8080/urlShort/api/v1/${entry.shortUrl}" target="_blank">${entry.shortUrl}</a></td>
-            <td>${entry.count}</td>
-          `;
-          tbody.appendChild(row);
-        });
-      })
-      .catch(error => {
-        console.error("Error fetching stats:", error);
-      });
-</script>
--->
 <script>
     fetch("http://localhost:8080/urlShort/api/v1/stats/top")
     .then(response => response.json())
@@ -50,9 +31,20 @@
       const tbody = document.querySelector("#statsTable tbody");
       data.forEach((entry, index) => {
         const row = document.createElement("tr");
+
+        // Apply special styling if expired
+        if (entry.expired) {
+          row.classList.add("expired");
+        }
+
+        // Render short URL either as link or plain text
+        const shortUrlCell = entry.expired
+          ? `<span>${entry.shortUrl}</span>`
+          : `<a href="http://localhost:8080/urlShort/api/v1/${entry.shortUrl}" target="_blank">${entry.shortUrl}</a>`;
+
         row.innerHTML = `
           <td>${index + 1}</td>
-          <td><a href="http://localhost:8080/urlShort/api/v1/${entry.shortUrl}" target="_blank">${entry.shortUrl}</a></td>
+          <td>${shortUrlCell}</td>
           <td>${entry.originalUrl ?? "(not found)"}</td>
           <td>${entry.count}</td>
         `;
