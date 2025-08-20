@@ -1,16 +1,4 @@
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
-    volumes:
-      - urlshort_mongodb_data:/data/db
-    networks:
-      - petiteurl-network
 
   petiteurl-service:
     build: .
@@ -18,13 +6,8 @@ services:
     ports:
       - "8080:8080"
       - "5005:5005"
-    volumes:
-      - ./stashingFolder:/urlShort/data
-    depends_on:
-      - mongodb
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://admin:password@mongodb:27017/petiteurl?authSource=admin
-      JAVA_TOOL_OPTIONS: "--add-opens=java.base/java.util.concurrent.locks=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED"
+      MONGODB_URI: "mongodb+srv://maciek100:Wisla@cowboy.r44csn2.mongodb.net/Cowboy?retryWrites=true&w=majority&appName=Cowboy"
 
 
     networks:
@@ -52,12 +35,6 @@ services:
       - "11211:11211"
     networks:
       - petiteurl-network
-
-
-
-
-volumes:
-  urlshort_mongodb_data:
 
 networks:
   petiteurl-network:
