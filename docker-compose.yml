@@ -7,8 +7,7 @@ services:
       - "8080:8080"
       - "5005:5005"
     environment:
-      MONGODB_URI: "mongodb+srv://maciek100:Wisla@cowboy.r44csn2.mongodb.net/Cowboy?retryWrites=true&w=majority&appName=Cowboy"
-
+      - MONGODB_URI=${MONGODB_URI}
 
     networks:
       - petiteurl-network
