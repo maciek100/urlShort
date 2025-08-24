@@ -24,9 +24,12 @@ public class UrlShortenerController {
     private UrlShortenerService urlShortenerService;
 
     @GetMapping("/cache_size")
-    public Mono<ResponseEntity<CacheStats>> getCacheSize() {
+    public Mono<ResponseEntity<Long>> getCacheSize() {
         return urlShortenerService.getCacheSize()
-                .map(stats -> ResponseEntity.status(stats.httpResult()).body(stats));
+                .map(ResponseEntity::ok)
+                .onErrorResume(e ->
+                        Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(0L))
+                );
     }
 
     @GetMapping("/alive")
@@ -61,7 +64,7 @@ public class UrlShortenerController {
     @GetMapping("/{shortCode}")
     public Mono<RedirectView> expandShortUrl(@PathVariable String shortCode) {
         logger.info("CALLED TO expand {}", shortCode);
-        return urlShortenerService.expandUrl(shortCode)
+        return urlShortenerService.expandUrl("short:" + shortCode)
                 .map(originalUrl -> {
                     RedirectView redirectView = new RedirectView();
                     redirectView.setUrl(originalUrl);

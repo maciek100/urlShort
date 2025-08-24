@@ -11,8 +11,8 @@ import urlShortener.repository.ShortUrlRepository;
 import urlShortener.service.UrlShortenerService;
 
 
-@Component
-@Order(1)
+//@Component
+//@Order(1)
 public class CacheWarmupRunner implements ApplicationRunner {
     private final Logger logger = LoggerFactory.getLogger(CacheWarmupRunner.class.getName());
     @Autowired

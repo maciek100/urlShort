@@ -7,6 +7,7 @@ services:
       - "8080:8080"
       - "5005:5005"
     environment:
+      - SPRING_PROFILES_ACTIVE=memcached
       - MONGODB_URI=${MONGODB_URI}
 
     networks:
@@ -34,6 +35,17 @@ services:
       - "11211:11211"
     networks:
       - petiteurl-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: petiteurl-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - petiteurl-network
+
+    command: [ "redis-server", "--appendonly", "yes" ]
 
 networks:
   petiteurl-network:
